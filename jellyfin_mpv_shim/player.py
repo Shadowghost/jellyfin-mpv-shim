@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -152,7 +153,7 @@ class PlayerManager(object):
         self.warned_about_transcode = False
         self.fullscreen_disable = False
         self.update_check = UpdateChecker(self)
-        self.is_in_intro = False
+        self.is_in_segment = False
         self.trickplay = None
 
         if is_using_ext_mpv:
@@ -269,8 +270,8 @@ class PlayerManager(object):
         @self._player.on_key_press("XF86_NEXT")
         def handle_media_next():
             if settings.media_key_seek:
-                if self.is_in_intro:
-                    self.skip_intro()
+                if self.is_in_segment:
+                    self.skip_segment()
                 else:
                     _x, seektime = self.get_seek_times()
                     self.seek(seektime)
@@ -316,8 +317,8 @@ class PlayerManager(object):
             if self.menu.is_menu_shown:
                 self.menu.menu_action("right")
             else:
-                if self.is_in_intro:
-                    self.skip_intro()
+                if self.is_in_segment:
+                    self.skip_segment()
                 else:
                     self.kb_seek("right")
 
@@ -326,8 +327,8 @@ class PlayerManager(object):
             if self.menu.is_menu_shown:
                 self.menu.menu_action("up")
             else:
-                if self.is_in_intro:
-                    self.skip_intro()
+                if self.is_in_segment:
+                    self.skip_segment()
                 else:
                     self.kb_seek("up")
 
@@ -459,13 +460,14 @@ class PlayerManager(object):
         if self.timeline_trigger:
             self.timeline_trigger.set()
 
-    def skip_intro(self):
-        _, intro = self._video.get_current_intro(self._player.playback_time)
+    def skip_segment(self):
+        _, segment = self._video.get_current_segment(self._player.playback_time)
+        log.info("Skipping segment: {}".format(json.dumps(vars(segment))))
 
-        self._player.playback_time = intro.end
-        intro.has_triggered = True
+        self._player.playback_time = segment.end
+        segment.has_triggered = True
         self.timeline_handle()
-        self.is_in_intro = False
+        self.is_in_segment = False
 
     @synchronous("_lock")
     def update(self):
@@ -480,41 +482,44 @@ class PlayerManager(object):
             and self._video is not None
             and self._player.playback_time is not None
         ):
-            ready_to_skip, intro = self._video.get_current_intro(
+            ready_to_skip, segment = self._video.get_current_segment(
                 self._player.playback_time
             )
 
-            if intro is not None:
+            if segment is not None:
+                outro_types = ["Outro", "Preview"]
+                intro_types = ["Intro"]
+                log.debug("Checking segment for skipping at {}: {}".format(self._player.playback_time, json.dumps(vars(segment))))
                 should_prompt = (
-                    intro.type != "Credits" and settings.skip_intro_prompt
-                ) or (intro.type == "Credits" and settings.skip_credits_prompt)
-                should_skip = (not intro.has_triggered) and (
-                    (intro.type != "Credits" and settings.skip_intro_always)
-                    or (intro.type == "Credits" and settings.skip_credits_always)
+                    segment.type in intro_types and settings.skip_intro_prompt
+                ) or (segment.type in outro_types and settings.skip_credits_prompt)
+                should_skip = (not segment.has_triggered) and (
+                    (segment.type in intro_types and settings.skip_intro_always)
+                    or (segment.type in outro_types and settings.skip_credits_always)
                 )
 
                 if should_skip and ready_to_skip:
-                    intro.has_triggered = True
-                    self.skip_intro()
+                    segment.has_triggered = True
+                    self.skip_segment()
                     self._player.show_text(
                         _("Skipped Credits")
-                        if intro.type == "Credits"
+                        if segment.type in outro_types
                         else _("Skipped Intro"),
                         3000,
                         1,
                     )
 
-                if not self.is_in_intro and should_prompt:
+                if not self.is_in_segment and should_prompt:
                     self._player.show_text(
                         _("Seek to Skip Credits")
-                        if intro.type == "Credits"
+                        if segment.type in outro_types
                         else _("Seek to Skip Intro"),
                         3000,
                         1,
                     )
-                self.is_in_intro = True
+                self.is_in_segment = True
             else:
-                self.is_in_intro = False
+                self.is_in_segment = False
 
         while not self.evt_queue.empty():
             func, args = self.evt_queue.get()
@@ -575,7 +580,7 @@ class PlayerManager(object):
             self._player.fs = True
         self._player.force_media_title = video.get_proper_title()
         self._video = video
-        self.is_in_intro = False
+        self.is_in_segment = False
         self.external_subtitles = {}
         self.external_subtitles_rev = {}
 
@@ -702,8 +707,8 @@ class PlayerManager(object):
                 if absolute:
                     if self.syncplay.is_enabled():
                         self.last_seek = offset
-                    if self.is_in_intro and offset > self._player.playback_time:
-                        self.skip_intro()
+                    if self.is_in_segment and offset > self._player.playback_time:
+                        self.skip_segment()
                     p2 = "absolute"
                     if exact:
                         p2 += "+exact"
@@ -712,11 +717,11 @@ class PlayerManager(object):
                     if self.syncplay.is_enabled():
                         self.last_seek = self._player.playback_time + offset
                     if (
-                        self.is_in_intro
+                        self.is_in_segment
                         and self._player.playback_time + offset
                         > self._player.playback_time
                     ):
-                        self.skip_intro()
+                        self.skip_segment()
                     if exact:
                         self._player.command("seek", offset, "exact")
                     else:

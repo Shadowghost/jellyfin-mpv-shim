@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - main
+      - test
 jobs:
   build-win64:
     runs-on: windows-latest

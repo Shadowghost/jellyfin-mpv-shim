@@ -18,12 +18,20 @@ if TYPE_CHECKING:
     from jellyfin_apiclient_python import JellyfinClient as JellyfinClient_type
 
 
-class Intro(object):
-    def __init__(self, type, start, end, ui_start):
-        self.type: str = type  # "Credits" or "Introduction"
-        self.start: float = start
-        self.end: float = end
-        self.ui_start: float = ui_start
+class MediaSegment(object):
+    def __init__(
+        self,
+        id: str,
+        item_id: str,
+        type: str,
+        start: float,
+        end: float
+    ):
+        self.id = id
+        self.item_id = item_id
+        self.type = type  # "Unknown", "Commercial", "Preview", "Recap", "Outro" or "Intro"
+        self.start = start
+        self.end = end
         self.has_triggered: bool = False
 
 
@@ -56,7 +64,7 @@ class Video(object):
         self.playback_info = None
         self.media_source = None
         self.srcid = srcid
-        self.intros: List[Intro] = []
+        self.media_segments: List[MediaSegment] = []
         self.intro_tried = False
 
     def map_streams(self):
@@ -251,36 +259,35 @@ class Video(object):
                 log.warning("Preferred media source is unplayable.")
             return selected
 
-    def get_intro(self, media_source_id):
+    def get_intro(self, item_id):
         if self.intro_tried:
             return
         self.intro_tried = True
 
-        # provided by plugin
         try:
-            skip_intro_data = self.client.jellyfin._get(
-                f"Episode/{media_source_id}/IntroSkipperSegments"
-            )
-            for type, intro in skip_intro_data.items():
-                if intro["Valid"]:
-                    self.intros.append(
-                        Intro(
-                            type,
-                            intro["IntroStart"],
-                            intro["IntroEnd"],
-                            intro["ShowSkipPromptAt"],
-                        )
+            media_segments = self.client.jellyfin.get_media_segments(item_id)['Items']
+            log.info("MediaSegments: {}".format(media_segments))
+            for segment in media_segments:
+                self.media_segments.append(
+                    MediaSegment(
+                        segment["Id"],
+                        segment["ItemId"],
+                        segment["Type"],
+                        segment["StartTicks"] / 10000000,
+                        segment["EndTicks"] / 10000000,
                     )
+                )
+            self.media_segments.sort(key=lambda x: (x.start, -(x.end - x.start)))
         except:
             log.warning(
-                "Fetching intro data failed. Do you have the plugin installed?",
+                "Fetching media segments failed. Make sure you are running Jellyfin 10.10+",
                 exc_info=1,
             )
 
-    def get_current_intro(self, time):
-        for intro in self.intros:
-            if (intro.ui_start <= time or intro.start <= time) and time <= intro.end:
-                return intro.start <= time, intro
+    def get_current_segment(self, time):
+        for segment in self.media_segments:
+            if segment.start <= time and time <= segment.end:
+                return segment.start <= time, segment
         return False, None
 
     def get_chapters(self):
