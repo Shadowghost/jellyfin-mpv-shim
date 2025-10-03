@@ -7,7 +7,7 @@ on:
       - main
 jobs:
   build-win64:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v5
@@ -52,7 +52,7 @@ jobs:
         name: windows
         path: ${{ github.workspace }}/publish/Installer/*.exe
   build-win64-legacy:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
         name: windows-legacy64
         path: ${{ github.workspace }}/publish/Installer/*.exe
   build-win32:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
