@@ -7,7 +7,7 @@ on:
       - main
 jobs:
   build-win64:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v5
@@ -32,6 +32,7 @@ jobs:
         mv libmpv-2.dll mpv-2.dll
         pip install wheel
         pip install .[all] pythonnet pywebview pywin32
+        winget install --id JRSoftware.InnoSetup -e -s winget
         ./gen_pkg.sh --skip-build
       shell: bash
     - name: PyInstaller Bootloader
@@ -52,7 +53,7 @@ jobs:
         name: windows
         path: ${{ github.workspace }}/publish/Installer/*.exe
   build-win64-legacy:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -77,6 +78,7 @@ jobs:
         mv libmpv-2.dll mpv-2.dll
         pip install wheel
         pip install .[all] pythonnet pywebview pywin32
+        winget install --id JRSoftware.InnoSetup -e -s winget
         ./gen_pkg.sh --skip-build
       shell: bash
     - name: PyInstaller Bootloader
@@ -97,7 +99,7 @@ jobs:
         name: windows-legacy64
         path: ${{ github.workspace }}/publish/Installer/*.exe
   build-win32:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -122,6 +124,7 @@ jobs:
         mv libmpv-2.dll mpv-2.dll
         pip install wheel
         pip install .[all] pythonnet pywebview pywin32
+        winget install --id JRSoftware.InnoSetup -e -s winget
         ./gen_pkg.sh --skip-build
       shell: bash
     - name: PyInstaller Bootloader
